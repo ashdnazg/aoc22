@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 use std::{fs, vec};
 
@@ -13,7 +13,87 @@ fn main() {
     // day3();
     // day4();
     // day5();
-    day6();
+    // day6();
+    day7();
+}
+
+fn day7() {
+    let contents = fs::read_to_string("aoc7.txt").unwrap();
+    let mut dir_stack: Vec<String> = vec!["".to_string()];
+    let mut files: HashMap<String, u64> = HashMap::new();
+    let mut dirs: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for line in contents.lines() {
+        if line.starts_with("$ cd") {
+            let new_dir = line.split_once("cd ").unwrap().1;
+            if new_dir == ".." {
+                dir_stack.pop();
+            } else {
+                let s = dir_stack.last().unwrap().to_string() + "/" + new_dir;
+                dir_stack.push(s);
+            }
+            continue;
+        }
+        if line.starts_with("$ ls") {
+            continue;
+        }
+        if line.starts_with("dir") {
+            let name = line.split_once(" ").unwrap().1;
+            dirs.entry(dir_stack.last().unwrap().clone())
+                .or_default()
+                .insert(dir_stack.last().unwrap().to_string() + "/" + name);
+            continue;
+        }
+        let (size, name) = line.split_once(" ").unwrap();
+        files.insert(
+            dir_stack.last().unwrap().to_string() + "/" + name,
+            size.parse().unwrap(),
+        );
+        dirs.entry(dir_stack.last().unwrap().clone())
+            .or_default()
+            .insert(dir_stack.last().unwrap().to_string() + "/" + name);
+    }
+
+    let sizes = calc_sizes(&files, &dirs, &"//");
+
+    let sum: u64 = sizes
+        .iter()
+        .filter(|(path, &size)| dirs.contains_key(*path) && size <= 100000)
+        .map(|(_, size)| size)
+        .sum();
+
+    let needed_size = sizes["//"] - 40000000;
+
+    let dir_to_del = sizes
+        .iter()
+        .filter(|(path, &size)| dirs.contains_key(*path) && size >= needed_size)
+        .map(|(_, size)| size)
+        .min()
+        .unwrap();
+
+    println!("{}", sum);
+    println!("{}", dir_to_del);
+}
+
+fn calc_sizes(
+    files: &HashMap<String, u64>,
+    dirs: &HashMap<String, HashSet<String>>,
+    path: &str,
+) -> HashMap<String, u64> {
+    let mut ret = HashMap::new();
+    if let Some(contents) = dirs.get(path) {
+        ret.insert(path.to_string(), 0);
+        for new_path in contents {
+            ret.extend(calc_sizes(files, dirs, new_path));
+            let size = ret[new_path];
+            *ret.entry(path.to_string()).or_default() += size;
+        }
+    }
+    if let Some(size) = files.get(path) {
+        ret.insert(path.to_string(), *size);
+    }
+
+    ret
 }
 
 fn day6() {
@@ -247,22 +327,22 @@ fn day2() {
     println!("{}", score2);
 }
 
-// fn day1() {
-//     let contents = fs::read_to_string("aoc1.txt").unwrap();
-//     let mut sums: Vec<u64> = contents
-//         .split("\n\n")
-//         .map(|single_elf| {
-//             single_elf
-//                 .split("\n")
-//                 .filter(|s| !s.is_empty())
-//                 .map(|calories| calories.parse::<u64>().unwrap())
-//                 .sum::<u64>()
-//         })
-//         .collect();
-//     sums.sort();
-//     println!("{}", sums.last().unwrap());
-//     println!(
-//         "{}",
-//         sums.pop().unwrap() + sums.pop().unwrap() + sums.pop().unwrap()
-//     );
-// }
+fn day1() {
+    let contents = fs::read_to_string("aoc1.txt").unwrap();
+    let mut sums: Vec<u64> = contents
+        .split("\n\n")
+        .map(|single_elf| {
+            single_elf
+                .split("\n")
+                .filter(|s| !s.is_empty())
+                .map(|calories| calories.parse::<u64>().unwrap())
+                .sum::<u64>()
+        })
+        .collect();
+    sums.sort();
+    println!("{}", sums.last().unwrap());
+    println!(
+        "{}",
+        sums.pop().unwrap() + sums.pop().unwrap() + sums.pop().unwrap()
+    );
+}
