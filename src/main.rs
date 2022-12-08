@@ -14,7 +14,118 @@ fn main() {
     // day4();
     // day5();
     // day6();
-    day7();
+    // day7();
+    day8();
+}
+
+fn day8() {
+    let contents = fs::read_to_string("aoc8.txt").unwrap();
+    let tree_matrix: Vec<Vec<_>> = contents.lines().map(|l| l.bytes().collect()).collect();
+
+    let height = tree_matrix.len();
+    let width = tree_matrix[0].len();
+
+    let mut visible: Vec<Vec<bool>> = (0..height)
+        .map(|_| (0..width).map(|_| false).collect())
+        .collect();
+
+    for y in 0..height {
+        let mut max_seen = -1;
+        for x in 0..width {
+            let current_height = tree_matrix[y][x] as i32;
+            if max_seen < current_height {
+                max_seen = current_height;
+                visible[y][x] = true;
+            }
+        }
+        max_seen = -1;
+        for x in (0..width).rev() {
+            let current_height = tree_matrix[y][x] as i32;
+            if max_seen < current_height {
+                max_seen = current_height;
+                visible[y][x] = true;
+            }
+        }
+    }
+
+    for x in 0..width {
+        let mut max_seen = -1;
+        for y in 0..height {
+            let current_height = tree_matrix[y][x] as i32;
+            if max_seen < current_height {
+                max_seen = current_height;
+                visible[y][x] = true;
+            }
+        }
+        max_seen = -1;
+        for y in (0..height).rev() {
+            let current_height = tree_matrix[y][x] as i32;
+            if max_seen < current_height {
+                max_seen = current_height;
+                visible[y][x] = true;
+            }
+        }
+    }
+
+    let num_seen = visible
+        .iter()
+        .flat_map(|row| row.iter())
+        .filter(|&visible| *visible)
+        .count();
+
+    println!("{}", num_seen);
+
+    let max_tree = (0..height)
+        .cartesian_product(0..width)
+        .map(|(y, x)| scenic_score(x, y, &tree_matrix))
+        .max()
+        .unwrap();
+
+    println!("{}", max_tree);
+}
+
+fn scenic_score(x: usize, y: usize, tree_matrix: &Vec<Vec<u8>>) -> u64 {
+    let height = tree_matrix.len();
+    let width = tree_matrix[0].len();
+    if x == 0 || x == width || y == 0 || y == height {
+        return 0;
+    }
+
+    let tree_height = tree_matrix[y][x];
+
+    let mut right = 0;
+    for x2 in (x + 1)..width {
+        right += 1;
+        if tree_matrix[y][x2] >= tree_height {
+            break;
+        }
+    }
+
+    let mut left = 0;
+    for x2 in (0..x).rev() {
+        left += 1;
+        if tree_matrix[y][x2] >= tree_height {
+            break;
+        }
+    }
+
+    let mut down = 0;
+    for y2 in (y + 1)..height {
+        down += 1;
+        if tree_matrix[y2][x] >= tree_height {
+            break;
+        }
+    }
+
+    let mut up = 0;
+    for y2 in (0..y).rev() {
+        up += 1;
+        if tree_matrix[y2][x] >= tree_height {
+            break;
+        }
+    }
+
+    up * down * left * right
 }
 
 fn day7() {
