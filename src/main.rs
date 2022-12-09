@@ -15,7 +15,91 @@ fn main() {
     // day5();
     // day6();
     // day7();
-    day8();
+    // day8();
+    day9();
+}
+
+fn day9() {
+    let contents = fs::read_to_string("aoc9.txt").unwrap();
+    let pairs: Vec<(char, i32)> = contents
+        .lines()
+        .map(|l| l.split_once(" ").unwrap())
+        .map(|(cs, n)| (cs.chars().next().unwrap(), n.parse().unwrap()))
+        .collect();
+
+    let mut head_x = 0;
+    let mut head_y = 0;
+    let mut tail_x = 0;
+    let mut tail_y = 0;
+
+    let mut visited: HashSet<(i32, i32)> = HashSet::from([(0, 0)]);
+
+    for (dir, num_steps) in pairs.iter() {
+        let (dx, dy) = match dir {
+            'R' => (1, 0),
+            'L' => (-1, 0),
+            'U' => (0, 1),
+            'D' => (0, -1),
+            _ => unreachable!(),
+        };
+        for _ in 0..*num_steps {
+            head_x += dx;
+            head_y += dy;
+            (tail_x, tail_y) = move_tail(head_x, head_y, tail_x, tail_y);
+            visited.insert((tail_x, tail_y));
+        }
+    }
+    println!("{}", visited.len());
+    visited.clear();
+
+    let mut positions: Vec<(i32, i32)> = vec![
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+    ];
+    for (dir, num_steps) in pairs.iter() {
+        let (dx, dy) = match dir {
+            'R' => (1, 0),
+            'L' => (-1, 0),
+            'U' => (0, 1),
+            'D' => (0, -1),
+            _ => unreachable!(),
+        };
+        for _ in 0..*num_steps {
+            let (x, y) = positions[0];
+            positions[0] = (x + dx, y + dy);
+            for i in 0..9 {
+                head_x += dx;
+                head_y += dy;
+                positions[i + 1] = move_tail(
+                    positions[i].0,
+                    positions[i].1,
+                    positions[i + 1].0,
+                    positions[i + 1].1,
+                );
+            }
+            visited.insert(positions[9]);
+        }
+    }
+
+    println!("{}", visited.len());
+}
+
+fn move_tail(head_x: i32, head_y: i32, tail_x: i32, tail_y: i32) -> (i32, i32) {
+    let dx = head_x - tail_x;
+    let dy = head_y - tail_y;
+    if dx.abs() != 2 && dy.abs() != 2 {
+        return (tail_x, tail_y);
+    }
+
+    (head_x - dx / 2, head_y - dy / 2)
 }
 
 fn day8() {
