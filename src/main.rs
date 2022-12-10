@@ -16,7 +16,49 @@ fn main() {
     // day6();
     // day7();
     // day8();
-    day9();
+    // day9();
+    day10();
+}
+
+fn day10() {
+    let contents = fs::read_to_string("aoc10.txt").unwrap();
+    let mut x: i32 = 1;
+    let mut cycle: i32 = 0;
+    let mut signal_sum = 0;
+
+    let mut screen: Vec<bool> = vec![];
+
+    for line in contents.lines() {
+        if line == "noop" {
+            cycle += 1;
+            if (cycle + 20) % 40 == 0 {
+                signal_sum += x * cycle;
+            }
+            screen.push((x % 40 - (cycle - 1) % 40).abs() <= 1);
+            continue;
+        }
+        let delta = line.split_once(" ").unwrap().1.parse::<i32>().unwrap();
+        cycle += 1;
+        if (cycle + 20) % 40 == 0 {
+            signal_sum += x * cycle;
+        }
+        screen.push((x % 40 - (cycle - 1) % 40).abs() <= 1);
+        cycle += 1;
+        if (cycle + 20) % 40 == 0 {
+            signal_sum += x * cycle;
+        }
+        screen.push((x % 40 - (cycle - 1) % 40).abs() <= 1);
+        x += delta;
+    }
+
+    println!("{}", signal_sum);
+
+    for (i, b) in screen.iter().enumerate() {
+        print!("{}", if *b { '#' } else { '.' });
+        if i % 40 == 39 {
+            println!();
+        }
+    }
 }
 
 fn day9() {
