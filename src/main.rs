@@ -17,7 +17,140 @@ fn main() {
     // day7();
     // day8();
     // day9();
-    day10();
+    // day10();
+    day11();
+}
+
+fn day11() {
+    let contents = fs::read_to_string("aoc11.txt").unwrap();
+    let mut monkeys: Vec<Monkey> = vec![];
+    let mut lines = contents.lines();
+    while let Some(monkey) = parse_monkey(&mut lines) {
+        monkeys.push(monkey);
+    }
+    let mut monkeys2 = monkeys.clone();
+
+    let common_divisor: u64 = monkeys.iter().map(|m| m.divisor).product();
+
+    for _ in 0..20 {
+        monkey_round(&mut monkeys, common_divisor, true);
+    }
+
+    let product: usize = monkeys
+        .iter()
+        .map(|m| m.inspected)
+        .sorted()
+        .rev()
+        .take(2)
+        .product();
+
+    println!("{}", product);
+
+    for _ in 0..10000 {
+        monkey_round(&mut monkeys2, common_divisor, false);
+    }
+
+    let product2: usize = monkeys2
+        .iter()
+        .map(|m| m.inspected)
+        .sorted()
+        .rev()
+        .take(2)
+        .product();
+
+    println!("{}", product2);
+}
+
+fn parse_monkey<'a>(lines: &mut impl Iterator<Item = &'a str>) -> Option<Monkey> {
+    if lines.next().is_none() {
+        return None;
+    }
+    let items = lines
+        .next()
+        .unwrap()
+        .rsplit_once(": ")
+        .unwrap()
+        .1
+        .split(", ")
+        .map(|n| n.parse::<u64>().unwrap())
+        .collect();
+
+    let operation = lines.next().unwrap();
+    let operand = operation.rsplit_once(" ").unwrap().1.parse::<u64>().ok();
+    let is_multiply = operation.contains("*");
+
+    let divisor = lines
+        .next()
+        .unwrap()
+        .rsplit_once(" ")
+        .unwrap()
+        .1
+        .parse::<u64>()
+        .unwrap();
+
+    let target_true = lines
+        .next()
+        .unwrap()
+        .rsplit_once(" ")
+        .unwrap()
+        .1
+        .parse::<usize>()
+        .unwrap();
+    let target_false = lines
+        .next()
+        .unwrap()
+        .rsplit_once(" ")
+        .unwrap()
+        .1
+        .parse::<usize>()
+        .unwrap();
+    lines.next();
+
+    Some(Monkey {
+        items,
+        operand,
+        is_multiply,
+        divisor,
+        target_true,
+        target_false,
+        inspected: 0,
+    })
+}
+
+fn monkey_round(monkeys: &mut Vec<Monkey>, common_divisor: u64, div3: bool) {
+    for i in 0..monkeys.len() {
+        let current_monkey = monkeys[i].clone();
+        for item in current_monkey.items {
+            let operand = current_monkey.operand.unwrap_or(item);
+            let mut new_level = if current_monkey.is_multiply {
+                item * operand
+            } else {
+                item + operand
+            } % common_divisor;
+            if div3 {
+                new_level /= 3;
+            }
+            let target = if new_level % current_monkey.divisor == 0 {
+                current_monkey.target_true
+            } else {
+                current_monkey.target_false
+            };
+            monkeys[target].items.push(new_level);
+        }
+        monkeys[i].inspected += monkeys[i].items.len();
+        monkeys[i].items.clear();
+    }
+}
+
+#[derive(Clone)]
+struct Monkey {
+    items: Vec<u64>,
+    operand: Option<u64>,
+    is_multiply: bool,
+    divisor: u64,
+    target_true: usize,
+    target_false: usize,
+    inspected: usize,
 }
 
 fn day10() {
