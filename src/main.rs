@@ -18,7 +18,81 @@ fn main() {
     // day8();
     // day9();
     // day10();
-    day11();
+    // day11();
+    day12();
+}
+
+fn day12() {
+    let contents = fs::read_to_string("aoc12.txt").unwrap();
+    let matrix: Vec<Vec<_>> = contents.lines().map(|l| l.chars().collect()).collect();
+    bfs(&matrix, 'S', 'E', true);
+    bfs(&matrix, 'E', 'a', false);
+}
+
+fn bfs(matrix: &Vec<Vec<char>>, start: char, end: char, is_up: bool) {
+    let (start_y, start_x) = matrix
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (i, l.iter().find_position(|&c| *c == start)))
+        .find_map(|(i, j)| j.map(|j2| (i, j2.0)))
+        .unwrap();
+
+    let mut open = HashSet::from([(start_x, start_y)]);
+    let mut closed: HashSet<(usize, usize)> = HashSet::new();
+    let mut steps = 0;
+    'Bob: loop {
+        let mut new_nodes: HashSet<(usize, usize)> = HashSet::new();
+        for (x, y) in open.iter() {
+            if matrix[*y][*x] == end {
+                break 'Bob;
+            }
+            new_nodes.extend(
+                expand(*x, *y, &matrix, is_up)
+                    .iter()
+                    .filter(|coord| !closed.contains(coord) && !open.contains(coord)),
+            );
+            closed.insert((*x, *y));
+        }
+        open = new_nodes;
+        steps += 1;
+    }
+
+    println!("{}", steps);
+}
+
+fn expand(x: usize, y: usize, matrix: &Vec<Vec<char>>, is_up: bool) -> Vec<(usize, usize)> {
+    let value = get_value(matrix[y][x]);
+    let mut ret = vec![];
+    if x > 0 && test_position(get_value(matrix[y][x - 1]), value, is_up) {
+        ret.push((x - 1, y));
+    }
+    if x < matrix[y].len() - 1 && test_position(get_value(matrix[y][x + 1]), value, is_up) {
+        ret.push((x + 1, y));
+    }
+    if y > 0 && test_position(get_value(matrix[y - 1][x]), value, is_up) {
+        ret.push((x, y - 1));
+    }
+    if y < matrix.len() - 1 && test_position(get_value(matrix[y + 1][x]), value, is_up) {
+        ret.push((x, y + 1));
+    }
+
+    ret
+}
+
+fn test_position(new_value: i32, value: i32, is_up: bool) -> bool {
+    if is_up {
+        new_value - value <= 1
+    } else {
+        new_value - value >= -1
+    }
+}
+
+fn get_value(c: char) -> i32 {
+    match c {
+        'S' => 'a' as i32,
+        'E' => 'z' as i32,
+        _ => c as i32,
+    }
 }
 
 fn day11() {
