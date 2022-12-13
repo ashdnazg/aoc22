@@ -19,7 +19,109 @@ fn main() {
     // day9();
     // day10();
     // day11();
-    day12();
+    // day12();
+    day13();
+}
+
+fn day13() {
+    let contents = fs::read_to_string("aoc13.txt").unwrap();
+    let pairs: Vec<_> = contents
+        .split("\n\n")
+        .map(|pair_string| pair_string.split_once("\n").unwrap())
+        .map(|(p1_string, p2_string)| {
+            (
+                parse_packet_data(p1_string).0,
+                parse_packet_data(p2_string).0,
+            )
+        })
+        .collect();
+
+    let ascending_count: usize = pairs
+        .iter()
+        .enumerate()
+        .filter(|(i, (p1, p2))| p1.cmp(p2) == std::cmp::Ordering::Less)
+        .map(|(i, (_, _))| i + 1)
+        .sum();
+
+    println!("{}", ascending_count);
+
+    let mut all_packets: Vec<_> = pairs.iter().flat_map(|(p1, p2)| [p1, p2]).collect();
+    let div1 = parse_packet_data("[[2]]").0;
+    let div2 = parse_packet_data("[[6]]").0;
+    all_packets.push(&div1);
+    all_packets.push(&div2);
+
+    all_packets.sort();
+    let key: usize = all_packets
+        .iter()
+        .enumerate()
+        .filter(|(i, &p)| *p == div1 || *p == div2)
+        .map(|(i, _)| i + 1)
+        .product();
+
+    println!("{}", key);
+}
+
+fn parse_packet_data(s: &str) -> (PacketData, &str) {
+    let mut remaining = if s.starts_with(",") {
+        s.split_at(1).1
+    } else {
+        s
+    };
+    if remaining.starts_with("[") {
+        remaining = remaining.split_at(1).1;
+        let mut sub_data = vec![];
+        while !remaining.starts_with("]") {
+            let (data, new_remaining) = parse_packet_data(remaining);
+            sub_data.push(data);
+            remaining = new_remaining;
+        }
+        (PacketData::List(sub_data), remaining.split_at(1).1)
+    } else {
+        let next_closer = remaining.find("]").unwrap();
+        let next_comma = remaining.find(",").unwrap_or(usize::MAX);
+        let (value_string, new_remaining) = remaining.split_at(next_comma.min(next_closer));
+        (
+            PacketData::Value(value_string.parse().unwrap()),
+            new_remaining,
+        )
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
+enum PacketData {
+    List(Vec<PacketData>),
+    Value(u64),
+}
+
+impl PartialOrd for PacketData {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PacketData {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (PacketData::List(l1), PacketData::List(l2)) => l1
+                .iter()
+                .zip_longest(l2.iter())
+                .map(|pair| match pair {
+                    itertools::EitherOrBoth::Both(p1, p2) => p1.cmp(p2),
+                    itertools::EitherOrBoth::Left(_) => std::cmp::Ordering::Greater,
+                    itertools::EitherOrBoth::Right(_) => std::cmp::Ordering::Less,
+                })
+                .find(|ord| ord.is_ne())
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (PacketData::List(_), PacketData::Value(v2)) => {
+                self.cmp(&PacketData::List(vec![PacketData::Value(*v2)]))
+            }
+            (PacketData::Value(v1), PacketData::List(_)) => {
+                PacketData::List(vec![PacketData::Value(*v1)]).cmp(other)
+            }
+            (PacketData::Value(v1), PacketData::Value(v2)) => v1.cmp(v2),
+        }
+    }
 }
 
 fn day12() {
