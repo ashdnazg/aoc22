@@ -20,7 +20,71 @@ fn main() {
     // day10();
     // day11();
     // day12();
-    day13();
+    // day13();
+    day14();
+}
+
+fn day14() {
+    let contents = fs::read_to_string("aoc14.txt").unwrap();
+    let wall_lines: HashSet<(i32, i32)> = contents
+        .lines()
+        .flat_map(|l| {
+            l.split(" -> ")
+                .map(|pair| pair.split_once(",").unwrap())
+                .map(|(x, y)| (x.parse::<i32>().unwrap(), y.parse::<i32>().unwrap()))
+                .tuple_windows()
+                .flat_map(|((x1, y1), (x2, y2))| (x1.min(x2)..=x1.max(x2)).cartesian_product(y1.min(y2)..=y2.max(y1)))
+        })
+        .collect();
+
+    let max_y = *wall_lines.iter().map(|(_, y)| y).max().unwrap();
+
+    let mut blocked_places = wall_lines.clone();
+    let mut sand_x = 500;
+    let mut sand_y = 0;
+    while sand_y < max_y {
+        if !blocked_places.contains(&(sand_x, sand_y + 1)) {
+            sand_y += 1;
+        } else if !blocked_places.contains(&(sand_x - 1, sand_y + 1)) {
+            sand_y += 1;
+            sand_x -= 1;
+        } else if !blocked_places.contains(&(sand_x + 1, sand_y + 1)) {
+            sand_y += 1;
+            sand_x += 1;
+        } else {
+            blocked_places.insert((sand_x, sand_y));
+            sand_x = 500;
+            sand_y = 0;
+        }
+    }
+    let resting_sand = blocked_places.len() - wall_lines.len();
+    println!("{}", resting_sand);
+
+    blocked_places = wall_lines.clone();
+
+    sand_x = 500;
+    sand_y = 0;
+    loop {
+        if !blocked_places.contains(&(sand_x, sand_y + 1)) && sand_y < max_y + 1 {
+            sand_y += 1;
+        } else if !blocked_places.contains(&(sand_x - 1, sand_y + 1)) && sand_y < max_y + 1 {
+            sand_y += 1;
+            sand_x -= 1;
+        } else if !blocked_places.contains(&(sand_x + 1, sand_y + 1)) && sand_y < max_y + 1 {
+            sand_y += 1;
+            sand_x += 1;
+        } else {
+            blocked_places.insert((sand_x, sand_y));
+            if sand_y == 0 {
+                break
+            }
+            sand_x = 500;
+            sand_y = 0;
+        }
+    }
+
+    let resting_sand2 = blocked_places.len() - wall_lines.len();
+    println!("{}", resting_sand2);
 }
 
 fn day13() {
