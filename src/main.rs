@@ -21,7 +21,65 @@ fn main() {
     // day11();
     // day12();
     // day13();
-    day14();
+    // day14();
+    day15();
+}
+
+fn day15() {
+    // Sensor at x=391282, y=2038170: closest beacon is at x=-532461, y=2166525
+    let contents = fs::read_to_string("aoc15.txt").unwrap();
+    let reports: Vec<(i64, i64, i64, i64)> = contents
+        .lines()
+        .map(|l| l.split_once(": closest beacon is at ").unwrap())
+        .map(|(left_str, right_str)| (parse_coord(left_str), parse_coord(right_str)))
+        .map(|((sx, sy), (bx, by))| (sx, sy, bx, by))
+        .collect();
+
+    let impossible_xs: HashSet<_> = reports
+        .iter()
+        .flat_map(|&(sx, sy, bx, by)| {
+            let dist = sx.abs_diff(bx) as i64 + sy.abs_diff(by) as i64;
+            let row_dist = sy.abs_diff(2000000) as i64;
+            (sx - dist + row_dist)..(sx + dist - row_dist)
+        })
+        .collect();
+
+    println!("{}", impossible_xs.len());
+
+    for y in 0..4000001 {
+        let mut impossible_ranges: Vec<_> = reports
+            .iter()
+            .map(|&(sx, sy, bx, by)| {
+                let dist = sx.abs_diff(bx) as i64 + sy.abs_diff(by) as i64;
+                let row_dist = sy.abs_diff(y) as i64;
+                (sx - dist + row_dist)..(sx + dist - row_dist + 1)
+            })
+            .filter(|r| !r.is_empty())
+            .collect();
+
+        impossible_ranges.sort_by(|a, b| a.start.cmp(&b.start));
+
+        let mut max_end = 0;
+        for range in impossible_ranges {
+            if range.start > max_end {
+                println!("{}", max_end * 4000000 + y);
+                break;
+            }
+            if range.end > 4000000 {
+                break;
+            }
+            max_end = max_end.max(range.end);
+        }
+    }
+}
+
+fn parse_coord(s: &str) -> (i64, i64) {
+    let (remaining_str, y_str) = s.rsplit_once(", y=").unwrap();
+
+    (
+        remaining_str.rsplit_once("x=").unwrap().1.parse().unwrap(),
+        y_str.parse().unwrap(),
+    )
 }
 
 fn day14() {
@@ -33,7 +91,9 @@ fn day14() {
                 .map(|pair| pair.split_once(",").unwrap())
                 .map(|(x, y)| (x.parse::<i32>().unwrap(), y.parse::<i32>().unwrap()))
                 .tuple_windows()
-                .flat_map(|((x1, y1), (x2, y2))| (x1.min(x2)..=x1.max(x2)).cartesian_product(y1.min(y2)..=y2.max(y1)))
+                .flat_map(|((x1, y1), (x2, y2))| {
+                    (x1.min(x2)..=x1.max(x2)).cartesian_product(y1.min(y2)..=y2.max(y1))
+                })
         })
         .collect();
 
@@ -76,7 +136,7 @@ fn day14() {
         } else {
             blocked_places.insert((sand_x, sand_y));
             if sand_y == 0 {
-                break
+                break;
             }
             sand_x = 500;
             sand_y = 0;
