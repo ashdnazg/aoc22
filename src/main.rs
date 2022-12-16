@@ -70,38 +70,152 @@ fn day16() {
         })
         .collect();
 
-    let initial_state = State{ open_valves: 0, flow: 0 };
-    let mut best_states: Vec<Vec<State>> = Vec::new();
-    best_states.resize(valves_vec.len(), vec![]);
-    best_states[valve_to_idx["AA"]].push(value)
+    let initial_state = State {
+        open_valves: 0,
+        position: valve_to_idx["AA"],
+        prev_position: None,
+    };
+    let mut best_states: HashMap<State, u64> = HashMap::new();
+    best_states.insert(initial_state, 0);
 
-    // for i in 0..30 {
-    //     println!("level: {} count: {}", i, best_states.len());
-    //     let mut new_best_states: HashMap<u64, Vec<()>> = HashMap::new();
-    //     for (state, flow) in best_states {
-    //         let released_flow: u64 = valves_vec.iter().enumerate().filter(|(index, _)| state.open_valves & (1 << index) != 0).map(|(_, (flow, _))| flow).sum();
-    //         if state.open_valves & (1 << state.position) == 0 {
-    //             let new_state = State { open_valves: state.open_valves | (1 << state.position), position: state.position };
-    //             let current_value = new_best_states.entry(new_state).or_default();
-    //             *current_value = (*current_value).max(flow + released_flow);
-    //         }
-    //         for &target_valve in valves_vec[state.position].1.iter() {
-    //             let new_state = State { open_valves: state.open_valves, position: target_valve };
-    //             let current_value = new_best_states.entry(new_state).or_default();
-    //             *current_value = (*current_value).max(flow + released_flow);
-    //         }
-    //     }
-    //     best_states = new_best_states;
-    // }
-    // let best_flow = best_states.values().max().unwrap();
+    for i in 0..30 {
+        let mut new_best_states: HashMap<State, u64> = HashMap::new();
+        for (state, flow) in best_states {
+            let released_flow: u64 = valves_vec
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| state.open_valves & (1 << index) != 0)
+                .map(|(_, (flow, _))| flow)
+                .sum();
+            if state.open_valves & (1 << state.position) == 0 && valves_vec[state.position].0 > 0 {
+                let new_state = State {
+                    open_valves: state.open_valves | (1 << state.position),
+                    position: state.position,
+                    prev_position: None,
+                };
+                let current_value = new_best_states.entry(new_state).or_default();
+                *current_value = (*current_value).max(flow + released_flow);
+            }
+            for &target_valve in valves_vec[state.position].1.iter() {
+                if Some(target_valve) == state.prev_position {
+                    continue;
+                }
+                let new_state = State {
+                    open_valves: state.open_valves,
+                    position: target_valve,
+                    prev_position: Some(state.position),
+                };
+                let current_value = new_best_states.entry(new_state).or_default();
+                *current_value = (*current_value).max(flow + released_flow);
+            }
+        }
+        best_states = new_best_states;
+    }
+    let best_flow = best_states.values().max().unwrap();
 
-    // println!("{}", best_flow);
+    println!("{}", best_flow);
+
+    let initial_state = State2 {
+        open_valves: 0,
+        position: valve_to_idx["AA"],
+        prev_position: None,
+        elephant_position: valve_to_idx["AA"],
+        prev_elephant_position: None,
+    };
+    let mut best_states: HashMap<State2, u64> = HashMap::new();
+    best_states.insert(initial_state, 0);
+
+    for i in 0..26 {
+        let mut new_best_states: HashMap<State2, u64> = HashMap::new();
+        for (state, flow) in best_states {
+            let mut states_me: Vec<State2> = vec![];
+            let mut states_elephant: Vec<State2> = vec![];
+            let released_flow: u64 = valves_vec
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| state.open_valves & (1 << index) != 0)
+                .map(|(_, (flow, _))| flow)
+                .sum();
+            if state.open_valves & (1 << state.position) == 0 && valves_vec[state.position].0 > 0 {
+                states_me.push(State2 {
+                    open_valves: state.open_valves | (1 << state.position),
+                    position: state.position,
+                    prev_position: None,
+                    elephant_position: state.elephant_position,
+                    prev_elephant_position: state.prev_elephant_position,
+                });
+            }
+            for &target_valve in valves_vec[state.position].1.iter() {
+                if Some(target_valve) == state.prev_position {
+                    continue;
+                }
+                states_me.push(State2 {
+                    open_valves: state.open_valves,
+                    position: target_valve,
+                    prev_position: Some(state.position),
+                    elephant_position: state.elephant_position,
+                    prev_elephant_position: state.prev_elephant_position,
+                });
+            }
+            if state.open_valves & (1 << state.elephant_position) == 0
+                && valves_vec[state.elephant_position].0 > 0
+            {
+                states_elephant.push(State2 {
+                    open_valves: state.open_valves | (1 << state.elephant_position),
+                    position: state.position,
+                    prev_position: state.prev_position,
+                    elephant_position: state.elephant_position,
+                    prev_elephant_position: None,
+                });
+            }
+            for &target_valve in valves_vec[state.elephant_position].1.iter() {
+                if Some(target_valve) == state.prev_elephant_position {
+                    continue;
+                }
+                states_elephant.push(State2 {
+                    open_valves: state.open_valves,
+                    position: state.position,
+                    prev_position: state.prev_position,
+                    elephant_position: target_valve,
+                    prev_elephant_position: Some(state.elephant_position),
+                });
+            }
+            let new_flow = flow + released_flow;
+            for (state_me, state_elephant) in
+                states_me.iter().cartesian_product(states_elephant.iter())
+            {
+                let combined_state = State2 {
+                    open_valves: state_me.open_valves | state_elephant.open_valves,
+                    position: state_me.position,
+                    prev_position: state_me.prev_position,
+                    elephant_position: state_elephant.elephant_position,
+                    prev_elephant_position: state_elephant.prev_elephant_position,
+                };
+                let current_value = new_best_states.entry(combined_state).or_default();
+                *current_value = (*current_value).max(new_flow);
+            }
+        }
+        best_states = new_best_states;
+    }
+    let best_flow = best_states.values().max().unwrap();
+
+    println!("{}", best_flow);
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 struct State {
     open_valves: u64,
-    flow: usize
+    position: usize,
+    prev_position: Option<usize>,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct State2 {
+    open_valves: u64,
+    position: usize,
+    prev_position: Option<usize>,
+    elephant_position: usize,
+    prev_elephant_position: Option<usize>,
 }
 
 fn day15() {
