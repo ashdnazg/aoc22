@@ -22,11 +22,89 @@ fn main() {
     // day12();
     // day13();
     // day14();
-    day15();
+    // day15();
+    day16();
+}
+
+fn day16() {
+    let contents = fs::read_to_string("aoc16.txt").unwrap();
+    let valves: HashMap<&str, (u64, Vec<&str>)> = contents
+        .lines()
+        .map(|l| l.split_once("to valve").unwrap())
+        .map(|(start, targets_str)| {
+            (
+                start
+                    .split_once(";")
+                    .unwrap()
+                    .0
+                    .split_once(" has flow rate=")
+                    .unwrap(),
+                targets_str.split_once(" ").unwrap().1.split(", ").collect(),
+            )
+        })
+        .map(|((start, flow_rate_str), targets)| {
+            (
+                start.split_once(" ").unwrap().1,
+                (flow_rate_str.parse().unwrap(), targets),
+            )
+        })
+        .collect();
+
+    let idx_to_valve: Vec<&str> = valves.keys().cloned().collect();
+    let valve_to_idx: HashMap<&str, usize> = idx_to_valve
+        .iter()
+        .enumerate()
+        .map(|(index, &valve)| (valve, index))
+        .collect();
+    let valves_vec: Vec<(u64, Vec<usize>)> = idx_to_valve
+        .iter()
+        .map(|valve| &valves[valve])
+        .map(|(flow, targets_vec)| {
+            (
+                *flow,
+                targets_vec
+                    .iter()
+                    .map(|&target_valve| valve_to_idx[target_valve])
+                    .collect(),
+            )
+        })
+        .collect();
+
+    let initial_state = State{ open_valves: 0, flow: 0 };
+    let mut best_states: Vec<Vec<State>> = Vec::new();
+    best_states.resize(valves_vec.len(), vec![]);
+    best_states[valve_to_idx["AA"]].push(value)
+
+    // for i in 0..30 {
+    //     println!("level: {} count: {}", i, best_states.len());
+    //     let mut new_best_states: HashMap<u64, Vec<()>> = HashMap::new();
+    //     for (state, flow) in best_states {
+    //         let released_flow: u64 = valves_vec.iter().enumerate().filter(|(index, _)| state.open_valves & (1 << index) != 0).map(|(_, (flow, _))| flow).sum();
+    //         if state.open_valves & (1 << state.position) == 0 {
+    //             let new_state = State { open_valves: state.open_valves | (1 << state.position), position: state.position };
+    //             let current_value = new_best_states.entry(new_state).or_default();
+    //             *current_value = (*current_value).max(flow + released_flow);
+    //         }
+    //         for &target_valve in valves_vec[state.position].1.iter() {
+    //             let new_state = State { open_valves: state.open_valves, position: target_valve };
+    //             let current_value = new_best_states.entry(new_state).or_default();
+    //             *current_value = (*current_value).max(flow + released_flow);
+    //         }
+    //     }
+    //     best_states = new_best_states;
+    // }
+    // let best_flow = best_states.values().max().unwrap();
+
+    // println!("{}", best_flow);
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct State {
+    open_valves: u64,
+    flow: usize
 }
 
 fn day15() {
-    // Sensor at x=391282, y=2038170: closest beacon is at x=-532461, y=2166525
     let contents = fs::read_to_string("aoc15.txt").unwrap();
     let reports: Vec<(i64, i64, i64, i64)> = contents
         .lines()
