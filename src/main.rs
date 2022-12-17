@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use std::collections::{HashMap, HashSet};
-use std::ops::RangeInclusive;
+use std::ops::{RangeInclusive, Shl, Shr};
 use std::{fs, vec};
 
 use itertools::Itertools;
@@ -23,7 +23,101 @@ fn main() {
     // day13();
     // day14();
     // day15();
-    day16();
+    // day16();
+    day17();
+}
+
+fn day17() {
+    let contents = fs::read_to_string("aoc17.txt").unwrap();
+    let is_right: Vec<bool> = contents.trim().chars().map(|c| c == '>').collect();
+    let floor: u16 = 0b1111111111111111;
+    let walls: u16 = 0b1000000011111111;
+    let shapes: Vec<Vec<u16>> = vec![
+        vec![0b0001111000000000],
+        vec![0b0000100000000000, 0b0001110000000000, 0b0000100000000000],
+        vec![0b0000010000000000, 0b0000010000000000, 0b0001110000000000],
+        vec![
+            0b0001000000000000,
+            0b0001000000000000,
+            0b0001000000000000,
+            0b0001000000000000,
+        ],
+        vec![0b0001100000000000, 0b0001100000000000],
+    ];
+
+    let mut finished_rows: Vec<u16> = vec![floor];
+    let mut shape_index = 0usize;
+    let mut move_index = 0usize;
+    let mut repeat: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
+    let mut row_period = 0;
+    let mut period = 0;
+    for i in 0..10000 {
+        if i == 2022 {
+            println!("{}", finished_rows.len() - 1);
+        }
+        if repeat.contains_key(&(shape_index % shapes.len(), move_index % is_right.len())) {
+            row_period = finished_rows.len()
+                - repeat[&(shape_index % shapes.len(), move_index % is_right.len())].0;
+            period = i - repeat[&(shape_index % shapes.len(), move_index % is_right.len())].1;
+        }
+        repeat.insert(
+            (shape_index % shapes.len(), move_index % is_right.len()),
+            (finished_rows.len(), i),
+        );
+        let mut shift = 0;
+        let mut height = finished_rows.len() + 3;
+        let shape = &shapes[shape_index % shapes.len()];
+        shape_index += 1;
+        loop {
+            let is_right_move = is_right[move_index % is_right.len()];
+            move_index += 1;
+            let shift_delta = if is_right_move { 1 } else { -1 };
+            if !check_collision(shape, &finished_rows, shift + shift_delta, height) {
+                shift += shift_delta;
+            }
+
+            if !check_collision(shape, &finished_rows, shift, height - 1) {
+                height -= 1;
+            } else {
+                break;
+            }
+        }
+        let new_finished_rows_len = shape.len() + height;
+        if new_finished_rows_len > finished_rows.len() {
+            finished_rows.resize(new_finished_rows_len, walls);
+        }
+        for (i, shape_row) in shape.iter().rev().enumerate() {
+            finished_rows[height + i] |= shift_row(*shape_row, shift);
+        }
+    }
+
+    let possible_heights: Vec<usize> = repeat
+        .iter()
+        .filter(|((_, _), (height, index))| index % period == 1000000000000 % period)
+        .map(|((_, _), (height, index))| height + (1000000000000 - index) / period * row_period - 1)
+        .collect();
+    println!("{:?}", possible_heights);
+}
+
+fn check_collision(shape: &Vec<u16>, finished_rows: &Vec<u16>, shift: i32, height: usize) -> bool {
+    let walls: u16 = 0b1000000011111111;
+    for (i, shape_row) in shape.iter().rev().enumerate() {
+        let row = *finished_rows.get(height + i).unwrap_or(&walls);
+        if shift_row(*shape_row, shift) & row != 0 {
+            return true;
+        }
+    }
+    false
+}
+
+fn shift_row(row: u16, shift: i32) -> u16 {
+    if shift == 0 {
+        row
+    } else if shift < 0 {
+        row.shl(-shift)
+    } else {
+        row.shr(shift)
+    }
 }
 
 fn day16() {
