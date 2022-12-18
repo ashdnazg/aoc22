@@ -24,7 +24,113 @@ fn main() {
     // day14();
     // day15();
     // day16();
-    day17();
+    // day17();
+    day18();
+}
+
+fn day18() {
+    let contents = fs::read_to_string("aoc18.txt").unwrap();
+    let coords: HashSet<(i64, i64, i64)> = contents
+        .lines()
+        .map(|s| s.split_once(",").unwrap())
+        .map(|(x_str, yz_str)| (x_str.parse().unwrap(), yz_str.split_once(",").unwrap()))
+        .map(|(x, (y_str, z_str))| (x, y_str.parse().unwrap(), z_str.parse().unwrap()))
+        .collect();
+
+    let total_surface = measure_surface(&mut coords.iter());
+    println!("{}", total_surface);
+
+    let mut min_x = i64::MAX;
+    let mut min_y = i64::MAX;
+    let mut min_z = i64::MAX;
+    let mut max_x = i64::MIN;
+    let mut max_y = i64::MIN;
+    let mut max_z = i64::MIN;
+
+    for &(x, y, z) in coords.iter() {
+        min_x = min_x.min(x - 1);
+        min_y = min_y.min(y - 1);
+        min_z = min_z.min(z - 1);
+        max_x = max_x.max(x + 1);
+        max_y = max_y.max(y + 1);
+        max_z = max_z.max(z + 1);
+    }
+
+    let mut envelope: HashSet<(i64, i64, i64)> = HashSet::new();
+    envelope.extend(
+        (min_x..=max_x)
+            .cartesian_product(min_y..=max_y)
+            .flat_map(|(x, y)| [(x, y, min_z), (x, y, max_z)]),
+    );
+    envelope.extend(
+        (min_y..=max_y)
+            .cartesian_product(min_z..=max_z)
+            .flat_map(|(y, z)| [(min_x, y, z), (max_x, y, z)]),
+    );
+    envelope.extend(
+        (min_x..=max_x)
+            .cartesian_product(min_z..=max_z)
+            .flat_map(|(x, z)| [(x, min_y, z), (x, max_y, z)]),
+    );
+
+    loop {
+        let new_envelope: HashSet<(i64, i64, i64)> = envelope
+            .iter()
+            .flat_map(|&(x, y, z)| {
+                [
+                    (x, y, z),
+                    (x + 1, y, z),
+                    (x - 1, y, z),
+                    (x, y + 1, z),
+                    (x, y - 1, z),
+                    (x, y, z + 1),
+                    (x, y, z - 1),
+                ]
+            })
+            .filter(|(x, y, z)| {
+                (min_x..=max_x).contains(x)
+                    && (min_y..=max_y).contains(y)
+                    && (min_z..=max_z).contains(z)
+                    && !coords.contains(&(*x, *y, *z))
+            })
+            .collect();
+        if new_envelope == envelope {
+            break;
+        }
+        envelope = new_envelope;
+    }
+
+    let envelope_surface = (max_x - min_x + 1) * (max_y - min_y + 1) * 2
+        + (max_y - min_y + 1) * (max_z - min_z + 1) * 2
+        + (max_z - min_z + 1) * (max_x - min_x + 1) * 2;
+    let inner_surface =
+        measure_surface(&mut envelope.iter().chain(coords.iter())) - envelope_surface as usize;
+    let outer_surface = total_surface - inner_surface;
+
+    println!("{}", outer_surface);
+}
+
+fn measure_surface<'a>(coords: &mut impl Iterator<Item = &'a (i64, i64, i64)>) -> usize {
+    let mut exposed_midpoints_doubled: HashSet<(i64, i64, i64)> = HashSet::new();
+    for (x, y, z) in coords {
+        let sides = [
+            (2 * x + 1, 2 * y, 2 * z),
+            (2 * x - 1, 2 * y, 2 * z),
+            (2 * x, 2 * y + 1, 2 * z),
+            (2 * x, 2 * y - 1, 2 * z),
+            (2 * x, 2 * y, 2 * z + 1),
+            (2 * x, 2 * y, 2 * z - 1),
+        ];
+        for side in sides {
+            if exposed_midpoints_doubled.contains(&side) {
+                exposed_midpoints_doubled.remove(&side);
+            } else {
+                exposed_midpoints_doubled.insert(side);
+            }
+        }
+    }
+
+    exposed_midpoints_doubled.len()
 }
 
 fn day17() {
