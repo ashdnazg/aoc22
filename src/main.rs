@@ -25,7 +25,197 @@ fn main() {
     // day15();
     // day16();
     // day17();
-    day18();
+    // day18();
+    day19();
+}
+
+fn day19() {
+    let contents = fs::read_to_string("aoc19.txt").unwrap();
+    let raw_blueprints: Vec<Vec<(&str, Vec<(&str, u64)>)>> = contents
+        .lines()
+        .map(|l| {
+            l.split_once(": ")
+                .unwrap()
+                .1
+                .split(".")
+                .filter(|s| !s.is_empty())
+                .map(|robot_str| robot_str.trim().split_once(" robot costs ").unwrap())
+                .map(|(robot_type_str, costs_str)| {
+                    (
+                        robot_type_str.strip_prefix("Each ").unwrap(),
+                        costs_str
+                            .split(" and ")
+                            .map(|cost_str| cost_str.split_once(" ").unwrap())
+                            .map(|(amount_str, cost_type)| (cost_type, amount_str.parse().unwrap()))
+                            .collect(),
+                    )
+                })
+                .collect()
+        })
+        .collect();
+
+    let resource_to_index: HashMap<&str, usize> = raw_blueprints[0]
+        .iter()
+        .enumerate()
+        .map(|(i, &(resource, _))| (resource, i))
+        .collect();
+    let blueprints: Vec<_> = raw_blueprints
+        .iter()
+        .map(|blueprint| {
+            let mut robots = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+            for (robot_resource, costs) in blueprint.iter() {
+                for &(resource, amount) in costs.iter() {
+                    robots[resource_to_index[robot_resource]][resource_to_index[resource]] = amount;
+                }
+            }
+            robots
+        })
+        .collect();
+
+    let quality_level_sum: u64 = blueprints
+        .iter()
+        .enumerate()
+        .map(|(i, blueprint)| blueprint_geodes(blueprint, &resource_to_index, 24) * (i as u64 + 1))
+        .sum();
+
+    println!("{}", quality_level_sum);
+
+
+    let product: u64 = blueprints
+        .iter()
+        .take(3)
+        .map(|blueprint| blueprint_geodes(blueprint, &resource_to_index, 32))
+        .product();
+
+    println!("{}", product);
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+struct MineState {
+    robots: [u64; 4],
+    resources: [u64; 4],
+}
+
+fn blueprint_geodes(blueprint: &[[u64; 4]; 4], resource_to_index: &HashMap<&str, usize>, minutes: u64) -> u64 {
+    let mut starting_robots = [0; 4];
+    starting_robots[resource_to_index["ore"]] = 1;
+    let starting_resources = [0; 4];
+    let starting_state = MineState {
+        robots: starting_robots,
+        resources: starting_resources,
+    };
+    let mut states: HashSet<MineState> = HashSet::from([starting_state]);
+    for i in 0..(minutes - 1) {
+        states = states
+            .iter()
+            .flat_map(|state| step(blueprint, state))
+            .collect();
+
+        if states.len() < 50000 {
+            prune_states(&mut states);
+        }
+    }
+
+    states
+        .iter()
+        .map(|state| {
+            state.resources[resource_to_index["geode"]] + state.robots[resource_to_index["geode"]]
+        })
+        .max()
+        .unwrap()
+}
+
+fn prune_states(mine_states: &mut HashSet<MineState>) {
+    let mut sorted_states = Vec::from_iter(mine_states.iter());
+    sorted_states.sort_by(|a, b| {
+        (a.robots.iter().sum::<u64>() + a.resources.iter().sum::<u64>())
+            .cmp(&(b.robots.iter().sum::<u64>() + b.resources.iter().sum::<u64>()))
+    });
+    *mine_states = mine_states
+        .iter()
+        .filter(|&state| {
+            !sorted_states.iter().any(|&other| {
+                other != state
+                    && other
+                        .resources
+                        .iter()
+                        .zip(state.resources.iter())
+                        .all(|(o, s)| o >= s)
+                    && other
+                        .robots
+                        .iter()
+                        .zip(state.robots.iter())
+                        .all(|(o, s)| o >= s)
+            })
+        })
+        .cloned()
+        .collect();
+}
+
+fn step(blueprint: &[[u64; 4]; 4], mine_state: &MineState) -> Vec<MineState> {
+    let mut possible_purchases = [0; 4];
+    for (i, robot_costs) in blueprint.iter().enumerate() {
+        possible_purchases[i] = robot_costs
+            .iter()
+            .zip(mine_state.resources)
+            .map(|(&cost, available)| {
+                if cost == 0 {
+                    u64::MAX
+                } else {
+                    available / cost
+                }
+            })
+            .min()
+            .unwrap()
+    }
+
+    let mut new_states = vec![];
+
+
+    for i in 0..4 {
+        if can_subtract_resources(&mine_state.resources, &blueprint[i]) {
+            let mut new_resources = mine_state.resources.clone();
+            let mut new_robots = mine_state.robots.clone();
+            subtract_resources(&mut new_resources, &blueprint[i]);
+            add_resources(&mut new_resources, &mine_state.robots);
+            new_robots[i] += 1;
+            new_states.push(MineState {
+                robots: new_robots,
+                resources: new_resources,
+            });
+        }
+    }
+
+    let mut new_resources = mine_state.resources.clone();
+    add_resources(&mut new_resources, &mine_state.robots);
+    new_states.push(MineState {
+        robots: mine_state.robots,
+        resources: new_resources,
+    });
+
+    new_states
+}
+
+fn can_subtract_resources(left: &[u64; 4], right: &[u64; 4]) -> bool {
+    for i in 0..left.len() {
+        if right[i] > left[i] {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn subtract_resources(left: &mut [u64; 4], right: &[u64; 4]) {
+    for i in 0..left.len() {
+        left[i] -= right[i];
+    }
+}
+
+fn add_resources(left: &mut [u64; 4], right: &[u64; 4]) {
+    for i in 0..left.len() {
+        left[i] += right[i];
+    }
 }
 
 fn day18() {
