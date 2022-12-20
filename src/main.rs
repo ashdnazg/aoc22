@@ -26,7 +26,78 @@ fn main() {
     // day16();
     // day17();
     // day18();
-    day19();
+    // day19();
+    day20();
+}
+
+fn day20() {
+    let contents = fs::read_to_string("aoc20.txt").unwrap();
+    let data: Vec<i64> = contents.lines().map(|l| l.parse().unwrap()).collect();
+    let mut enumerated: Vec<(usize, i64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, delta)| (i, *delta))
+        .collect();
+    let mut next_move = 0usize;
+    let mut index = 0usize;
+    while next_move < data.len() {
+        if enumerated[index].0 != next_move {
+            index += 1;
+            continue;
+        }
+        let item = enumerated.remove(index);
+        let mut target = (index as i64 + item.1).rem_euclid(enumerated.len() as i64) as usize;
+        if target == 0 {
+            target = enumerated.len();
+        }
+        enumerated.insert(target, item);
+        next_move += 1;
+    }
+    let zero_index = enumerated
+        .iter()
+        .find_position(|(_, delta)| *delta == 0)
+        .unwrap()
+        .0;
+    let result = enumerated[(zero_index + 1000) % enumerated.len()].1
+        + enumerated[(zero_index + 2000) % enumerated.len()].1
+        + enumerated[(zero_index + 3000) % enumerated.len()].1;
+
+    println!("{}", result);
+
+    let mut enumerated2: Vec<(usize, i64)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, delta)| (i, *delta * 811589153))
+        .collect();
+
+    for _ in 0..10 {
+        for next_move in 0..enumerated2.len() {
+            let index = enumerated2
+                .iter()
+                .find_position(|(i, _)| *i == next_move)
+                .unwrap()
+                .0;
+
+            let item = enumerated2.remove(index);
+            let mut target = (index as i64 + item.1).rem_euclid(enumerated2.len() as i64) as usize;
+            if target == 0 {
+                target = enumerated2.len();
+            }
+            enumerated2.insert(target, item);
+        }
+    }
+
+    let zero_index = enumerated2
+        .iter()
+        .find_position(|(_, delta)| *delta == 0)
+        .unwrap()
+        .0;
+
+    let result = enumerated2[(zero_index + 1000) % enumerated2.len()].1
+        + enumerated2[(zero_index + 2000) % enumerated2.len()].1
+        + enumerated2[(zero_index + 3000) % enumerated2.len()].1;
+
+    println!("{}", result);
 }
 
 fn day19() {
@@ -80,7 +151,6 @@ fn day19() {
 
     println!("{}", quality_level_sum);
 
-
     let product: u64 = blueprints
         .iter()
         .take(3)
@@ -96,7 +166,11 @@ struct MineState {
     resources: [u64; 4],
 }
 
-fn blueprint_geodes(blueprint: &[[u64; 4]; 4], resource_to_index: &HashMap<&str, usize>, minutes: u64) -> u64 {
+fn blueprint_geodes(
+    blueprint: &[[u64; 4]; 4],
+    resource_to_index: &HashMap<&str, usize>,
+    minutes: u64,
+) -> u64 {
     let mut starting_robots = [0; 4];
     starting_robots[resource_to_index["ore"]] = 1;
     let starting_resources = [0; 4];
@@ -170,7 +244,6 @@ fn step(blueprint: &[[u64; 4]; 4], mine_state: &MineState) -> Vec<MineState> {
     }
 
     let mut new_states = vec![];
-
 
     for i in 0..4 {
         if can_subtract_resources(&mine_state.resources, &blueprint[i]) {
