@@ -27,7 +27,154 @@ fn main() {
     // day17();
     // day18();
     // day19();
-    day20();
+    // day20();
+    day21();
+}
+
+fn day21() {
+    let contents = fs::read_to_string("aoc21.txt").unwrap();
+    let yells: HashMap<String, Yell> = contents
+        .lines()
+        .map(|l| l.split_once(": ").unwrap())
+        .map(|(s, yell_str)| (s.to_owned(), parse(yell_str)))
+        .collect();
+
+    let result = yells["root"].calc(&yells);
+
+    println!("{}", result);
+
+    let result2 = yells["root"].rebalance(&yells);
+
+    println!("{}", result2);
+}
+
+fn parse(s: &str) -> Yell {
+    if let Ok(value) = s.parse::<i64>() {
+        return Yell::Value(value);
+    }
+    let (left, rest) = s.split_once(" ").unwrap();
+    let (op, right) = rest.split_once(" ").unwrap();
+
+    Yell::Operation(left.to_string(), op.to_string(), right.to_string())
+}
+
+#[derive(Clone)]
+enum Yell {
+    Value(i64),
+    Operation(String, String, String),
+}
+
+impl Yell {
+    fn calc(&self, yells: &HashMap<String, Yell>) -> i64 {
+        match self {
+            Yell::Value(v) => *v,
+            Yell::Operation(left, op, right) => match op.as_str() {
+                "+" => yells[left].calc(yells) + yells[right].calc(yells),
+                "/" => yells[left].calc(yells) / yells[right].calc(yells),
+                "*" => yells[left].calc(yells) * yells[right].calc(yells),
+                "-" => yells[left].calc(yells) - yells[right].calc(yells),
+                _ => unreachable!(),
+            },
+        }
+    }
+
+    fn rebalance(&self, yells: &HashMap<String, Yell>) -> i64 {
+        let Yell::Operation(left, _, right) = self else {
+            unreachable!();
+        };
+        let mut new_yells = yells.clone();
+        let mut humn_side;
+        let mut other_side;
+
+        if yells[left].find_humn(yells) {
+            humn_side = left.clone();
+            other_side = right.clone();
+        } else {
+            humn_side = right.clone();
+            other_side = left.clone();
+        }
+
+        while humn_side != "humn" {
+            match &yells[&humn_side] {
+                Yell::Value(_) => unreachable!(),
+                Yell::Operation(left, op, right) => {
+                    let new_name = humn_side.clone() + "inv";
+                    let (new_other_yell, new_human_side) = match op.as_str() {
+                        "/" => {
+                            if left == "humn" || yells[left].find_humn(yells) {
+                                (
+                                    Yell::Operation(right.clone(), "*".to_owned(), other_side),
+                                    left,
+                                )
+                            } else {
+                                (
+                                    Yell::Operation(left.clone(), "/".to_owned(), other_side),
+                                    right,
+                                )
+                            }
+                        }
+                        "+" => {
+                            if left == "humn" || yells[left].find_humn(yells) {
+                                (
+                                    Yell::Operation(other_side, "-".to_owned(), right.clone()),
+                                    left,
+                                )
+                            } else {
+                                (
+                                    Yell::Operation(other_side, "-".to_owned(), left.clone()),
+                                    right,
+                                )
+                            }
+                        }
+                        "*" => {
+                            if left == "humn" || yells[left].find_humn(yells) {
+                                (
+                                    Yell::Operation(other_side, "/".to_owned(), right.clone()),
+                                    left,
+                                )
+                            } else {
+                                (
+                                    Yell::Operation(other_side, "/".to_owned(), left.clone()),
+                                    right,
+                                )
+                            }
+                        }
+                        "-" => {
+                            if left == "humn" || yells[left].find_humn(yells) {
+                                (
+                                    Yell::Operation(right.clone(), "+".to_owned(), other_side),
+                                    left,
+                                )
+                            } else {
+                                (
+                                    Yell::Operation(left.clone(), "-".to_owned(), other_side),
+                                    right,
+                                )
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
+                    other_side = new_name.clone();
+                    new_yells.insert(new_name, new_other_yell);
+                    humn_side = new_human_side.clone();
+                }
+            }
+        }
+
+        new_yells[&other_side].calc(&new_yells)
+    }
+
+    fn find_humn(&self, yells: &HashMap<String, Yell>) -> bool {
+        match self {
+            Yell::Value(_) => false,
+            Yell::Operation(left, _, right) => {
+                left == "humn"
+                    || right == "humn"
+                    || yells[left].find_humn(yells)
+                    || yells[right].find_humn(yells)
+            }
+        }
+    }
 }
 
 fn day20() {
