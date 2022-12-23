@@ -28,7 +28,477 @@ fn main() {
     // day18();
     // day19();
     // day20();
-    day21();
+    // day21();
+    day22();
+}
+
+fn day22() {
+    let contents = fs::read_to_string("aoc22.txt").unwrap();
+    let (grid_str, instructions_str) = contents.split_once("\n\n").unwrap();
+    let grid: Vec<Vec<Tile>> = grid_str
+        .lines()
+        .map(|l| {
+            l.chars()
+                .map(|c| match c {
+                    ' ' => Tile::Empty,
+                    '#' => Tile::Wall,
+                    '.' => Tile::Open,
+                    _ => unreachable!(),
+                })
+                .collect()
+        })
+        .collect();
+    let instructions: Vec<Instruction22> = instructions_str
+        .trim()
+        .split_inclusive("R")
+        .flat_map(|s| s.split_inclusive("L"))
+        .map(|part| {
+            if part.ends_with("R") || part.ends_with("L") {
+                part.split_at(part.len() - 1)
+            } else {
+                (part, "")
+            }
+        })
+        .flat_map(|(token1, token2)| [token1, token2])
+        .filter(|token| !token.is_empty())
+        .map(|token| match token {
+            "R" => Instruction22::Turn(true),
+            "L" => Instruction22::Turn(false),
+            _ => Instruction22::Move(token.parse().unwrap()),
+        })
+        .collect();
+
+    let row_limits: Vec<(usize, usize)> = grid
+        .iter()
+        .map(|row| {
+            (
+                row.iter().find_position(|&t| *t != Tile::Empty).unwrap().0,
+                row.len()
+                    - row
+                        .iter()
+                        .rev()
+                        .find_position(|&t| *t != Tile::Empty)
+                        .unwrap()
+                        .0,
+            )
+        })
+        .collect();
+
+    let max_col = grid.iter().map(|row| row.len()).max().unwrap();
+    let col_limits: Vec<(usize, usize)> = (0..max_col)
+        .map(|col_index| {
+            (
+                grid.iter()
+                    .find_position(|row| row.get(col_index) != Some(&Tile::Empty))
+                    .unwrap()
+                    .0,
+                grid.len()
+                    - grid
+                        .iter()
+                        .rev()
+                        .find_position(|row| {
+                            row.len() >= col_index && row.get(col_index) != Some(&Tile::Empty)
+                        })
+                        .unwrap()
+                        .0,
+            )
+        })
+        .collect();
+
+    let mut dx: i64 = 1;
+    let mut dy: i64 = 0;
+    let mut x = row_limits[0].0;
+    let mut y = 0;
+
+    for instruction in instructions.iter() {
+        match instruction {
+            Instruction22::Move(amount) => {
+                for _ in 0..*amount {
+                    let new_x = (x as i64 + dx - row_limits[y].0 as i64)
+                        .rem_euclid((row_limits[y].1 - row_limits[y].0) as i64)
+                        as usize
+                        + row_limits[y].0;
+                    let new_y = (y as i64 + dy - col_limits[x].0 as i64)
+                        .rem_euclid((col_limits[x].1 - col_limits[x].0) as i64)
+                        as usize
+                        + col_limits[x].0;
+                    match grid[new_y][new_x] {
+                        Tile::Empty => unreachable!(),
+                        Tile::Wall => break,
+                        Tile::Open => {
+                            x = new_x;
+                            y = new_y;
+                        }
+                    }
+                }
+            }
+            Instruction22::Turn(is_clockwise) => {
+                (dx, dy) = if *is_clockwise {
+                    (dy * -1, dx)
+                } else {
+                    (dy, dx * -1)
+                };
+            }
+        }
+    }
+    let result = 1000 * (y as i64 + 1) + 4 * (x as i64 + 1) + (1 - dx) * (1 - dy) + dy * dy;
+    println!("{}", result);
+
+    let face_size = (grid
+        .iter()
+        .flat_map(|r| r.iter())
+        .filter(|&t| *t == Tile::Open || *t == Tile::Wall)
+        .count() as f64
+        / 6f64)
+        .sqrt() as usize;
+
+    let mut faces: HashMap<Face, Mapping> = HashMap::from([(
+        Face {
+            axis: Axis::Z,
+            value: false,
+        },
+        Mapping {
+            origin: (row_limits[0].0, 0),
+            dr: (1, 0),
+            dd: (0, 1),
+        },
+    )]);
+
+    while faces.len() < 6 {
+        let new_faces: Vec<(Face, Mapping)> = faces
+            .iter()
+            .flat_map(|(face, mapping)| get_neighbors(face, mapping, &grid, face_size))
+            .collect();
+
+        faces.extend(new_faces.into_iter());
+    }
+
+    let mut face = Face {
+        axis: Axis::Z,
+        value: false,
+    };
+    let mut x = 0i64;
+    let mut y = 0i64;
+    let mut dx = 1i64;
+    let mut dy = 0i64;
+
+    let face_range = 0i64..(face_size as i64);
+
+    for instruction in instructions.iter() {
+        match instruction {
+            Instruction22::Move(amount) => {
+                for _ in 0..*amount {
+                    let (updated_x, updated_y) = (x + dx, y + dy);
+                    let new_x;
+                    let new_y;
+                    let new_face;
+                    let new_dx;
+                    let new_dy;
+                    if face_range.contains(&updated_x) && face_range.contains(&updated_y) {
+                        new_x = updated_x;
+                        new_y = updated_y;
+                        new_dx = dx;
+                        new_dy = dy;
+                        new_face = face.clone();
+                    } else {
+                        if updated_x < 0 {
+                            new_face = face.left_face();
+                            if face.value {
+                                new_x = face_size as i64 - 1;
+                                new_y = updated_y;
+                                new_dx = -1;
+                                new_dy = 0;
+                            } else {
+                                new_x = updated_y;
+                                new_y = 0;
+                                new_dx = 0;
+                                new_dy = 1;
+                            }
+                        } else if updated_x >= face_size as i64 {
+                            new_face = face.right_face();
+                            if face.value {
+                                new_x = updated_y;
+                                new_y = face_size as i64 - 1;
+                                new_dx = 0;
+                                new_dy = -1;
+                            } else {
+                                new_x = 0;
+                                new_y = updated_y;
+                                new_dx = 1;
+                                new_dy = 0;
+                            }
+                        } else if updated_y < 0 {
+                            new_face = face.up_face();
+                            if face.value {
+                                new_x = updated_x;
+                                new_y = face_size as i64 - 1;
+                                new_dx = 0;
+                                new_dy = -1;
+                            } else {
+                                new_x = 0;
+                                new_y = updated_x;
+                                new_dx = 1;
+                                new_dy = 0;
+                            }
+                        } else if updated_y >= face_size as i64 {
+                            new_face = face.down_face();
+                            if face.value {
+                                new_x = face_size as i64 - 1;
+                                new_y = updated_x;
+                                new_dx = -1;
+                                new_dy = 0;
+                            } else {
+                                new_x = updated_x;
+                                new_y = 0;
+                                new_dx = 0;
+                                new_dy = 1;
+                            }
+                        } else {
+                            unreachable!();
+                        }
+                    }
+                    let mapping = &faces[&new_face];
+                    let actual_x =
+                        mapping.origin.0 as i64 + mapping.dr.0 * new_x + mapping.dd.0 * new_y;
+                    let actual_y =
+                        mapping.origin.1 as i64 + mapping.dr.1 * new_x + mapping.dd.1 * new_y;
+                    match grid[actual_y as usize][actual_x as usize] {
+                        Tile::Empty => unreachable!(),
+                        Tile::Wall => break,
+                        Tile::Open => {
+                            x = new_x;
+                            y = new_y;
+                            dx = new_dx;
+                            dy = new_dy;
+                            face = new_face;
+                        }
+                    }
+                }
+            }
+            Instruction22::Turn(is_clockwise) => {
+                (dx, dy) = if *is_clockwise {
+                    (dy * -1, dx)
+                } else {
+                    (dy, dx * -1)
+                };
+            }
+        }
+    }
+    let mapping = &faces[&face];
+
+    let actual_x = mapping.origin.0 as i64 + mapping.dr.0 * x + mapping.dd.0 * y;
+    let actual_y = mapping.origin.1 as i64 + mapping.dr.1 * x + mapping.dd.1 * y;
+    let actual_dx = dx * mapping.dr.0 + dy * mapping.dd.0;
+    let actual_dy = dy * mapping.dd.1 + dx * mapping.dr.1;
+
+    let result = 1000 * (actual_y as i64 + 1)
+        + 4 * (actual_x as i64 + 1)
+        + (1 - actual_dx) * (1 - actual_dy)
+        + actual_dy * actual_dy;
+    println!("{}", result);
+}
+
+fn get_neighbors(
+    face: &Face,
+    mapping: &Mapping,
+    grid: &Vec<Vec<Tile>>,
+    face_size: usize,
+) -> Vec<(Face, Mapping)> {
+    let mut result = Vec::new();
+    let left_origin_x = (mapping.origin.0 as i64
+        - mapping.dr.0 * (1 + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    let left_origin_y = (mapping.origin.1 as i64
+        - mapping.dr.1 * (1 + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    if let Some(Some(tile)) = grid.get(left_origin_y).map(|row| row.get(left_origin_x)) {
+        if tile != &Tile::Empty {
+            let other_face = face.left_face();
+            let new_dr = if face.value { mapping.dr } else { mapping.dd };
+            let new_dd = if face.value {
+                mapping.dd
+            } else {
+                (-mapping.dr.0, -mapping.dr.1)
+            };
+            let mapping = Mapping {
+                origin: (left_origin_x, left_origin_y),
+                dr: new_dr,
+                dd: new_dd,
+            };
+            result.push((other_face, mapping));
+        }
+    }
+    let up_origin_x = (mapping.origin.0 as i64
+        - mapping.dd.0 * (1 + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    let up_origin_y = (mapping.origin.1 as i64
+        - mapping.dd.1 * (1 + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    if let Some(Some(tile)) = grid.get(up_origin_y).map(|row| row.get(up_origin_x)) {
+        if tile != &Tile::Empty {
+            let other_face = face.up_face();
+            let new_dr = if face.value {
+                mapping.dr
+            } else {
+                (-mapping.dd.0, -mapping.dd.1)
+            };
+            let new_dd = if face.value { mapping.dd } else { mapping.dr };
+            let mapping = Mapping {
+                origin: (up_origin_x, up_origin_y),
+                dr: new_dr,
+                dd: new_dd,
+            };
+            result.push((other_face, mapping));
+        }
+    }
+
+    let right_origin_x = (mapping.origin.0 as i64
+        + mapping.dr.0 * (face_size + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    let right_origin_y = (mapping.origin.1 as i64
+        + mapping.dr.1 * (face_size + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    if let Some(Some(tile)) = grid.get(right_origin_y).map(|row| row.get(right_origin_x)) {
+        if tile != &Tile::Empty {
+            let other_face = face.right_face();
+            let new_dr = if face.value { mapping.dd } else { mapping.dr };
+            let new_dd = if face.value {
+                (-mapping.dr.0, -mapping.dr.1)
+            } else {
+                mapping.dd
+            };
+            let mapping = Mapping {
+                origin: (right_origin_x, right_origin_y),
+                dr: new_dr,
+                dd: new_dd,
+            };
+            result.push((other_face, mapping));
+        }
+    }
+
+    let down_origin_x = (mapping.origin.0 as i64
+        + mapping.dd.0 * (face_size + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    let down_origin_y = (mapping.origin.1 as i64
+        + mapping.dd.1 * (face_size + face.value as usize * (face_size - 1)) as i64)
+        as usize;
+    if let Some(Some(tile)) = grid.get(down_origin_y).map(|row| row.get(down_origin_x)) {
+        if tile != &Tile::Empty {
+            let other_face = face.down_face();
+            let new_dr = if face.value {
+                (-mapping.dd.0, -mapping.dd.1)
+            } else {
+                mapping.dr
+            };
+            let new_dd = if face.value { mapping.dr } else { mapping.dd };
+            let mapping = Mapping {
+                origin: (down_origin_x, down_origin_y),
+                dr: new_dr,
+                dd: new_dd,
+            };
+            result.push((other_face, mapping));
+        }
+    }
+    result
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+struct Face {
+    axis: Axis,
+    value: bool,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+struct Mapping {
+    origin: (usize, usize),
+    dr: (i64, i64),
+    dd: (i64, i64),
+}
+
+impl Face {
+    fn right_axis(&self) -> Axis {
+        self.axis.rotate(self.value)
+    }
+
+    fn down_axis(&self) -> Axis {
+        self.axis.rotate(!self.value)
+    }
+
+    fn left_face(&self) -> Face {
+        Face {
+            axis: self.right_axis(),
+            value: false,
+        }
+    }
+
+    fn right_face(&self) -> Face {
+        Face {
+            axis: self.right_axis(),
+            value: true,
+        }
+    }
+
+    fn up_face(&self) -> Face {
+        Face {
+            axis: self.down_axis(),
+            value: false,
+        }
+    }
+
+    fn down_face(&self) -> Face {
+        Face {
+            axis: self.down_axis(),
+            value: true,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+enum Axis {
+    X,
+    Y,
+    Z,
+}
+
+impl Axis {
+    fn rotate(&self, direction: bool) -> Axis {
+        match self {
+            Axis::X => {
+                if direction {
+                    Axis::Z
+                } else {
+                    Axis::Y
+                }
+            }
+            Axis::Y => {
+                if direction {
+                    Axis::X
+                } else {
+                    Axis::Z
+                }
+            }
+            Axis::Z => {
+                if direction {
+                    Axis::Y
+                } else {
+                    Axis::X
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum Tile {
+    Empty,
+    Wall,
+    Open,
+}
+
+#[derive(Debug)]
+enum Instruction22 {
+    Move(usize),
+    Turn(bool), // true = clockwise
 }
 
 fn day21() {
