@@ -29,7 +29,201 @@ fn main() {
     // day19();
     // day20();
     // day21();
-    day22();
+    // day22();
+    // day24();
+    day25();
+}
+
+fn day25() {
+    let contents = fs::read_to_string("aoc25.txt").unwrap();
+    let sum: i64 = contents.lines().map(|l| convert5(l)).sum();
+    println!("{}", unconvert5(sum))
+}
+
+fn convert5(s: &str) -> i64 {
+    s.chars()
+        .map(|c| match c {
+            '0' => 0,
+            '1' => 1,
+            '2' => 2,
+            '-' => -1,
+            '=' => -2,
+            _ => unreachable!(),
+        })
+        .rev()
+        .enumerate()
+        .map(|(i, num)| num * 5i64.pow(i as u32))
+        .sum()
+}
+
+fn unconvert5(n: i64) -> String {
+    let mut ret = "".to_owned();
+    let mut num = n;
+    while num != 0 {
+        let digit = (num + 2) % 5 - 2;
+        ret = match digit {
+            0 => "0",
+            1 => "1",
+            2 => "2",
+            -1 => "-",
+            -2 => "=",
+            _ => unreachable!(),
+        }
+        .to_string()
+            + &ret;
+        num -= digit;
+        num /= 5;
+    }
+    ret
+}
+
+fn day24() {
+    let contents = fs::read_to_string("aoc24.txt").unwrap();
+    let start_state: Vec<((usize, usize), char)> = contents
+        .lines()
+        .enumerate()
+        .flat_map(|(row, l)| l.chars().enumerate().map(move |(col, c)| ((col, row), c)))
+        .filter(|((_, _), c)| *c != '.')
+        .collect();
+
+    let height = start_state.iter().map(|((_, y), _)| y).max().unwrap() + 1;
+    let width = start_state.iter().map(|((x, _), _)| x).max().unwrap() + 1;
+
+    // let mut start_grid
+    let mut grids: Vec<Vec<Vec<bool>>> = vec![state_to_grid(&start_state, width, height)];
+    let mut current_state = step_state(&start_state, width, height);
+
+    while current_state != start_state {
+        grids.push(state_to_grid(&current_state, width, height));
+        current_state = step_state(&current_state, width, height);
+    }
+
+    let start = ((0..width).find(|&x| !grids[0][0][x]).unwrap(), 0usize);
+    let goal = (
+        (0..width).find(|&x| !grids[0][height - 1][x]).unwrap(),
+        height - 1,
+    );
+
+    let mut open = HashSet::from([start]);
+    // let mut closed: HashSet<(usize, usize)> = HashSet::new();
+
+    let mut i = 1;
+    loop {
+        let mut new_states: HashSet<(usize, usize)> = HashSet::new();
+        let next_grid = &grids[i % grids.len()];
+
+        for state in open.iter() {
+            new_states.extend(expand_state(state.0, state.1, next_grid, width, height));
+        }
+        if new_states.contains(&goal) {
+            break;
+        }
+        open = new_states;
+        i += 1;
+    }
+    println!("{}", i);
+
+    let mut open = HashSet::from([(start, false, false)]);
+
+    let mut i = 1;
+    loop {
+        let mut new_states: HashSet<((usize, usize), bool, bool)> = HashSet::new();
+        let next_grid = &grids[i % grids.len()];
+        for &(pos, reached_goal, reached_start) in open.iter() {
+            new_states.extend(
+                expand_state(pos.0, pos.1, next_grid, width, height)
+                    .into_iter()
+                    .map(|new_pos| {
+                        (
+                            new_pos,
+                            reached_goal || new_pos == goal,
+                            reached_start || (reached_goal && (pos == start)),
+                        )
+                    }),
+            );
+        }
+        open = new_states;
+        if open.contains(&(goal, true, true)) {
+            break;
+        }
+        i += 1;
+    }
+    println!("{}", i);
+}
+
+fn expand_state(
+    x: usize,
+    y: usize,
+    next_grid: &Vec<Vec<bool>>,
+    width: usize,
+    height: usize,
+) -> Vec<(usize, usize)> {
+    let mut result = vec![];
+    if x > 0 && !next_grid[y][x - 1] {
+        result.push((x - 1, y));
+    }
+    if y > 0 && !next_grid[y - 1][x] {
+        result.push((x, y - 1));
+    }
+    if x < width - 1 && !next_grid[y][x + 1] {
+        result.push((x + 1, y));
+    }
+    if y < height - 1 && !next_grid[y + 1][x] {
+        result.push((x, y + 1));
+    }
+    if !next_grid[y][x] {
+        result.push((x, y));
+    }
+
+    result
+}
+
+fn state_to_grid(
+    state: &Vec<((usize, usize), char)>,
+    width: usize,
+    height: usize,
+) -> Vec<Vec<bool>> {
+    let mut grid = vec![];
+    grid.resize(height, vec![]);
+    grid.iter_mut().for_each(|v| v.resize(width, false));
+    for ((x, y), c) in state.iter() {
+        grid[*y][*x] = true
+    }
+
+    grid
+}
+
+fn step_state(
+    state: &Vec<((usize, usize), char)>,
+    width: usize,
+    height: usize,
+) -> Vec<((usize, usize), char)> {
+    state
+        .iter()
+        .map(|&((x, y), c)| {
+            let new_pos = match c {
+                '<' => (x - 1, y),
+                '^' => (x, y - 1),
+                '>' => (x + 1, y),
+                'v' => (x, y + 1),
+                '#' => (x, y),
+                _ => unreachable!(),
+            };
+            if c == '#' {
+                (new_pos, c)
+            } else if new_pos.0 == 0 {
+                ((width - 2, y), c)
+            } else if new_pos.0 == width - 1 {
+                ((1, y), c)
+            } else if new_pos.1 == 0 {
+                ((x, height - 2), c)
+            } else if new_pos.1 == height - 1 {
+                ((x, 1), c)
+            } else {
+                (new_pos, c)
+            }
+        })
+        .collect()
 }
 
 fn day22() {
