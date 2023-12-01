@@ -30,6 +30,7 @@ fn main() {
     // day20();
     // day21();
     // day22();
+    // day23();
     // day24();
     day25();
 }
@@ -224,6 +225,109 @@ fn step_state(
             }
         })
         .collect()
+}
+
+fn day23() {
+    let contents = fs::read_to_string("aoc23.txt").unwrap();
+    let positions: HashSet<(i64, i64)> = contents
+        .lines()
+        .enumerate()
+        .flat_map(|(i, l)| {
+            l.chars()
+                .enumerate()
+                .filter(|(_, c)| *c == '#')
+                .map(move |(j, _)| (j as i64, i as i64))
+        })
+        .collect();
+
+    let dirs = [
+        ((-1, -1), (0, -1), (1, -1)),
+        ((-1, 1), (0, 1), (1, 1)),
+        ((-1, -1), (-1, 0), (-1, 1)),
+        ((1, -1), (1, 0), (1, 1)),
+    ];
+
+    let mut current_positions = positions.clone();
+    let mut i = 0;
+    loop {
+        // println!("start: {:?}", current_positions);
+        let mut new_occupancy: HashMap<(i64, i64), usize> = HashMap::new();
+        for (x, y) in current_positions.iter() {
+            if dirs.iter().all(|dir| {
+                !current_positions.contains(&(dir.0 .0 + x, dir.0 .1 + y))
+                    && !current_positions.contains(&(dir.1 .0 + x, dir.1 .1 + y))
+                    && !current_positions.contains(&(dir.2 .0 + x, dir.2 .1 + y))
+            }) {
+                continue;
+            }
+            for j in 0..4 {
+                let dir = &dirs[(i + j) % dirs.len()];
+
+                if !current_positions.contains(&(dir.0 .0 + x, dir.0 .1 + y))
+                    && !current_positions.contains(&(dir.1 .0 + x, dir.1 .1 + y))
+                    && !current_positions.contains(&(dir.2 .0 + x, dir.2 .1 + y))
+                {
+                    *new_occupancy
+                        .entry((dir.1 .0 + x, dir.1 .1 + y))
+                        .or_default() += 1;
+                    break;
+                }
+            }
+        }
+
+        let mut new_positions: HashSet<(i64, i64)> =
+            HashSet::with_capacity(current_positions.len());
+
+        // println!("occupancy: {:?}", new_occupancy);
+
+        for (x, y) in current_positions.iter() {
+            new_positions.insert((*x, *y));
+            if dirs.iter().all(|dir| {
+                !current_positions.contains(&(dir.0 .0 + x, dir.0 .1 + y))
+                    && !current_positions.contains(&(dir.1 .0 + x, dir.1 .1 + y))
+                    && !current_positions.contains(&(dir.2 .0 + x, dir.2 .1 + y))
+            }) {
+                continue;
+            }
+            for j in 0..4 {
+                let dir = &dirs[(i + j) % dirs.len()];
+
+                if !current_positions.contains(&(dir.0 .0 + x, dir.0 .1 + y))
+                    && !current_positions.contains(&(dir.1 .0 + x, dir.1 .1 + y))
+                    && !current_positions.contains(&(dir.2 .0 + x, dir.2 .1 + y))
+                {
+                    if new_occupancy[&(dir.1 .0 + x, dir.1 .1 + y)] < 2 {
+                        new_positions.remove(&(*x, *y));
+                        new_positions.insert((dir.1 .0 + x, dir.1 .1 + y));
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        if i == 9 {
+            let min_x = current_positions.iter().map(|(x, _)| x).min().unwrap();
+            let max_x = current_positions.iter().map(|(x, _)| x).max().unwrap();
+
+            let min_y = current_positions.iter().map(|(_, y)| y).min().unwrap();
+            let max_y = current_positions.iter().map(|(_, y)| y).max().unwrap();
+
+            let result = (max_x - min_x + 1) * (max_y - min_y + 1) - current_positions.len() as i64;
+
+            println!("{}", result);
+        }
+
+        if current_positions == new_positions {
+            println!("{}", i + 1);
+            break
+        } else {
+            i += 1;
+        }
+
+        current_positions = new_positions;
+        // println!("end: {:?}", current_positions);
+    }
 }
 
 fn day22() {
